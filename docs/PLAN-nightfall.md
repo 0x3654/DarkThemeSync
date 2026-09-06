@@ -1,6 +1,10 @@
 # План: встроить синк темы Windows прямо в Nightfall («коробка»)
 
-Цель: галка «Sync Windows theme (Parallels)» в настройках Nightfall. Когда включена — Nightfall сам переключает тему в VM при любой смене темы мака. Watcher и LaunchAgent после этого отключаем (файлы остаются в `mac/` как fallback).
+Цель: **установка с нуля = один Nightfall.app**. На маке ничего кроме приложения (никаких watcher'ов, агентов, `~/bin`). Приложение само разворачивает виндовую обвязку при первом включении галки и само же переключает темы.
+
+Текущие скрипты (`mac/`, `vm/`) — черновик-прототип, доказавший механику; после своей сборки агента глушим, скрипты → `prototype/`, содержимое `MacThemeSync.ps1` переезжает внутрь приложения Swift-константой.
+
+Почему на винде что-то должно быть: `prlctl exec` работает от SYSTEM, тему пользовательской сессии меняет только процесс в этой сессии (задача планировщика). Обойти нельзя, но приложение создаёт эту обвязку само (см. «Self-provisioning»).
 
 База: `nightfall-fork/` (upstream r-thomson/Nightfall @ 9e3f0a1, см. `UPSTREAM`). Приложение установлено в `/Applications/Nightfall.app`.
 
@@ -127,6 +131,35 @@ if syncWindowsVM.value {
 
 UI-строки на английском — в стиле приложения (локализаций в Nightfall нет).
 
+### 6. Self-provisioning — приложение само ставит виндовую обвязку
+
+Чтобы «установка с нуля = только приложение». Вместо ручного прогона `vm/setup-task.ps1`.
+
+Новый файл `Nightfall/Utility/WindowsVMProvisioner.swift` (~150 строк):
+
+```swift
+enum WindowsVMProvisioner {
+    /// prlctl list -a --json → [VM] (имя, состояние, windows: bool)
+    static func listVMs() -> [ParallelsVM]
+
+    /// Разворачивает обвязку в одной запущенной VM. Идемпотентно (/F).
+    static func setup(vm: String) async throws -> ProvisionStatus
+
+    /// Снимает обвязку (schtasks /Delete + rm файлов).
+    static func remove(vm: String) async throws
+}
+```
+
+Шаги `setup(vm:)` — обкатано черновиком (`vm/push-payload.sh`, `vm/setup-task.ps1`):
+1. Залить `MacThemeSync.ps1` + `.vbs` в `C:\Users\Public`: содержимое ps1 — Swift-константа (сырой текст из `vm/setup-task.ps1`, без here-string), base64 → `prlctl exec` кусками по ~700 симв. (`Set-Content`/`Add-Content`) → decode → `WriteAllText`. Лимит длины команды prlctl ~4–5 КБ — потому кусками, с проверкой длины на приёме.
+2. `schtasks /Create /F /TN MacThemeSync /TR wscript.exe C:\Users\Public\MacThemeSync.vbs /SC ONCE /ST 23:59 /RU <user> /IT`, где `<user>` = `(Get-CimInstance Win32_ComputerSystem).UserName` (не SYSTEM!).
+3. Сразу чистить триггер-заглушку: `$t=Get-ScheduledTask MacThemeSync; $t.Triggers=@(); Set-ScheduledTask -InputObject $t` — никакого прогона в 23:59.
+4. Верификация `schtasks /Query /TN MacThemeSync` → статус в UI.
+
+UX: первое включение галки → диалог «выбери VM» (список из `prlctl list -a`, виндовые помечены; выделены по умолчанию запущенные) → Setup → per-VM статус (✓ / «VM выключена — запусти и повтори» / «нет Parallels Tools?»). Выбранные имена → `WindowsVMNames` (список через запятую). Кнопка «Remove from VMs» — снятие обвязки.
+
+Важно: VM должна быть **запущена** в момент setup (prlctl exec не работает в остановленную). Для WinRU — тот же диалог при первом запуске.
+
 ## Сборка и установка
 
 ```bash
@@ -145,7 +178,8 @@ xcodebuild -project Nightfall.xcodeproj -scheme Nightfall -configuration Release
 
 ```bash
 launchctl bootout gui/$(id -u)/local.mac2win-theme-sync   # watcher больше не нужен
-# plist и ~/bin/mac2win-theme.sh оставить в репо (mac/) как fallback
+rm ~/Library/LaunchAgents/local.mac2win-theme-sync.plist ~/bin/mac2win-theme.sh
+git mv mac vm prototype/   # черновик больше не рабочий механизм, а история прототипа
 ```
 
 Задачу `MacThemeSync` в VM **не** удалять — Nightfall дергает её же.
