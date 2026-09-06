@@ -9,7 +9,7 @@
 | Файл | Что там | Что делаем |
 |---|---|---|
 | `Nightfall/ToggleDarkMode.swift` | `toggleDarkMode()` — единственная точка переключения (хоткей и клик по menubar оба ведут сюда) | после `setAppearanceTheme` пушим в VM |
-| `Nightfall/Extensions/UserDefaults.swift` | `struct Keys` + 3 настройки | + `SyncWindowsVM` (Bool), `WindowsVMName` (String) |
+| `Nightfall/Extensions/UserDefaults.swift` | `struct Keys` + 3 настройки | + `SyncWindowsVM` (Bool), `WindowsVMName` (String, список VM через запятую) |
 | `Nightfall/Views/PreferencesView.swift` | SwiftUI-поповвер, 240pt, 3 тумблера + рекордер хоткея | + Toggle и TextField имени VM |
 | `Nightfall/Utility/AppearanceTheme.swift` | get/set через приватный SkyLight API | не трогаем |
 | `Nightfall/AppDelegate.swift` | запуск приложения | + обзервер + первичный пуш |
@@ -35,8 +35,9 @@ var syncWindowsVM: Bool {
 }
 
 var windowsVMName: String {
-    // дефолт в геттере: поле заполнено с первого открытия настроек,
-    // в defaults значение пишется только после ручного редактирования
+    // список VM через запятую ("Windows 11, WinRU"); дефолт в геттере:
+    // поле заполнено с первого открытия настроек, в defaults значение
+    // пишется только после ручного редактирования
     get { self.object(forKey: Keys.windowsVMName) as? String ?? "Windows 11" }
     set { self.set(newValue, forKey: Keys.windowsVMName) }
 }
@@ -47,8 +48,9 @@ var windowsVMName: String {
 ```swift
 import Foundation
 
-/// Проталкивает текущую тему в Windows (Parallels VM). Fire-and-forget:
-/// VM выключена/спит — тихо ничего не происходит.
+/// Проталкивает текущую тему в Windows-VM (Parallels). Fire-and-forget:
+/// каждая VM запускается отдельным Process'ом (параллельно),
+/// выключенная/спящая VM тихо фейлится, остальные живут.
 enum WindowsThemeSync {
     static func push(_ theme: AppearanceTheme) {
         let defaults = UserDefaults.standard
@@ -57,12 +59,20 @@ enum WindowsThemeSync {
         let mode = theme == .dark ? "dark" : "light"
         let cmd = "Set-Content C:\\Users\\Public\\mac_theme.txt '\(mode)'; schtasks /Run /TN MacThemeSync"
 
-        let task = Process()
-        task.executableURL = URL(fileURLWithPath: "/usr/local/bin/prlctl")
-        task.arguments = ["exec", defaults.windowsVMName, "powershell", "-NoProfile", "-Command", cmd]
-        task.standardOutput = FileHandle.nullDevice
-        task.standardError = FileHandle.nullDevice
-        try? task.run()   // не ждём завершения
+        // "Windows 11, WinRU" → ["Windows 11", "WinRU"]
+        let vms = defaults.windowsVMName
+            .split(whereSeparator: { $0 == "," || $0 == ";" })
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        for vm in vms {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: "/usr/local/bin/prlctl")
+            task.arguments = ["exec", vm, "powershell", "-NoProfile", "-Command", cmd]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            try? task.run()   // не ждём завершения
+        }
     }
 }
 ```
@@ -109,7 +119,7 @@ DistributedNotificationCenter.default().addObserver(
 Divider().padding(.vertical, 6)
 Toggle("Sync Windows theme (Parallels)", isOn: $syncWindowsVM.value)
 if syncWindowsVM.value {
-    TextField("VM name", text: $windowsVMName.value)
+    TextField("VMs, comma-separated", text: $windowsVMName.value)
         .textFieldStyle(.roundedBorder)
         .padding(.leading, 18)
 }
@@ -146,4 +156,9 @@ launchctl bootout gui/$(id -u)/local.mac2win-theme-sync   # watcher больше
 2. Смена темы через Control Center → VM тоже перекрасилась (обзервер).
 3. VM выключена → переключения на маке не дают ошибок/фризов, prlctl тихо завершается.
 4. Галка off → prlctl вообще не запускается (проверить `ps`).
-5. Имя VM в поле → синк идёт в указанную VM.
+5. Поле `Windows 11, WinRU`, обе запущены → перекрасились обе; WinRU выключена → перекрасилась только Windows 11, без ошибок.
+
+## Идеи на потом
+
+- Kali (не виндовая тема): отдельный пуш через `prlctl exec <kali> sudo -u <user> gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'|'prefer-light'` — если понадобится.
+- Опционально — автоопределение списка VM через `prlctl list -a` вместо ручного поля.
