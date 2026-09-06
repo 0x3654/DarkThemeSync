@@ -13,12 +13,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			UserDefaults.Keys.useTransition: true,
 			UserDefaults.Keys.startAtLogin: false,
 			UserDefaults.Keys.checkForUpdates: true,
+			UserDefaults.Keys.syncWindowsVM: false,
+			UserDefaults.Keys.windowsVMName: "Windows 11",
 		])
 
 		// Register global keyboard shortcut listener
 		KeyboardShortcuts.onKeyDown(for: .toggleDarkMode) {
 			toggleDarkMode()
 		}
+
+		// Push the theme to Windows VMs whenever the system appearance changes,
+		// no matter the source (Nightfall itself, Control Center, Shortcuts, schedule).
+		DistributedNotificationCenter.default().addObserver(
+			self,
+			selector: #selector(appearanceChanged),
+			name: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
+			object: nil
+		)
+
+		// Initial sync in case a VM booted after the Mac's theme was already set
+		WindowsThemeSync.push(dark: getAppearanceTheme() == .dark)
 
 		// Begin checking for updates periodically
 		AppUpdateChecker.shared.startBackgroundChecking()
@@ -32,6 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 			options: [.initial, .new],
 			context: nil
 		)
+	}
+
+	@objc func appearanceChanged() {
+		WindowsThemeSync.push(dark: getAppearanceTheme() == .dark)
 	}
 
 	func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool)

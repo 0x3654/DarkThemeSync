@@ -17,6 +17,10 @@ struct PreferencesView: View {
 		ObservableUserDefault<Bool>(UserDefaults.Keys.startAtLogin)
 	@ObservedObject private var checkForUpdates =
 		ObservableUserDefault<Bool>(UserDefaults.Keys.checkForUpdates)
+	@ObservedObject private var syncWindowsVM =
+		ObservableUserDefault<Bool>(UserDefaults.Keys.syncWindowsVM)
+	@ObservedObject private var windowsVMName =
+		ObservableUserDefault<String>(UserDefaults.Keys.windowsVMName)
 
 	@State var hasScreenCapturePermission: Bool? = nil
 
@@ -56,6 +60,18 @@ struct PreferencesView: View {
 				Toggle("Start Nightfall at login", isOn: $startAtLogin.value)
 
 				Toggle("Check for new versions", isOn: $checkForUpdates.value)
+
+				Divider()
+					.padding(.vertical, 6)
+
+				Toggle("Sync Windows theme (Parallels)", isOn: $syncWindowsVM.value)
+
+				if syncWindowsVM.value {
+					TextField("VMs, comma-separated", text: $windowsVMName.value)
+						.textFieldStyle(.roundedBorder)
+						.font(.system(size: 11))
+						.padding(.leading, 18)
+				}
 			}
 			.frame(maxWidth: .infinity, alignment: .leading)
 		}
