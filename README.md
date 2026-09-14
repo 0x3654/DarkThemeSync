@@ -1,75 +1,56 @@
 # DarkThemeSync
 
-Автоматическая синхронизация светлой/тёмной темы: **macOS → Windows в Parallels VM**.
-Ответ на вопрос «почему винда сама не переключается и Parallels не синхронизирует» — теперь переключается.
+Форк [Nightfall](https://github.com/r-thomson/Nightfall) — переключатель тёмной темы macOS — с синхронизацией темы в Windows-VM Parallels.
 
-## Как это работает
+> [!IMPORTANT]
+> **Этот форк** (база — оригинальный [r-thomson/Nightfall](https://github.com/r-thomson/Nightfall) @ `9e3f0a1`) расширяет его:
+>
+> - 🌓 **Синк темы в Windows-VM** — галка в настройках: любая смена темы мака (хоткей, Control Center, таймер) перекрашивает все указанные Parallels-VM с Windows за пару секунд. Событийно, без поллинга.
+> - 🖥 **Self-provisioning** — приложение само находит VM, кнопкой Setup разворачивает обвязку в госте и показывает статус каждой VM; Remove снимает. Установка с нуля = один app.
+> - ⚙️ **Список VM через запятую** — пуш параллельно во все живые, выключенные тихо пропускаются.
+> - 🔓 **App Sandbox снята** — без неё нельзя запускать `prlctl`.
 
+---
+
+Nightfall lets you manage macOS's dark mode from the menu bar. Left click the icon to toggle dark mode; right click to reveal additional options.
+
+https://user-images.githubusercontent.com/29545379/150662417-90e6a4f8-7ad9-436a-8ee9-0b11882e0d4a.mp4
+
+## Download
+
+| | Version | Signed |
+|---|---|---|
+| **This fork** (+ Windows-VM theme sync) | [releases of this repository](../../releases) | ✗ ad-hoc |
+| **Official release** | [latest](https://github.com/r-thomson/Nightfall/releases/latest) | ✓ |
+
+1. Download **Nightfall-arm64.zip** from the releases page
+2. Unzip and move **Nightfall.app** into **Applications**
+3. Launch — grant **Screen Recording** permission if you enable animated transitions
+
+> Unsigned build note: on first launch macOS may block the app.
+> Right-click → **Open** → **Open**, or System Settings → Privacy & Security → **Open Anyway**.
+
+### Build from source
+
+```sh
+cd nightfall-fork
+xcodebuild -project Nightfall.xcodeproj -scheme Nightfall -configuration Release \
+  -derivedDataPath build CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="BetterOSD Dev"
 ```
-macOS (тема сменилась: Nightfall / хоткей / таймер / Control Center)
-   │  watcher: ~/bin/mac2win-theme.sh (poll AppleInterfaceStyle, 1 сек)
-   ▼
-prlctl exec "Windows 11" powershell "Set-Content C:\Users\Public\mac_theme.txt '<dark|light>'; schtasks /Run /TN MacThemeSync"
-   │  (prlctl exec работает от SYSTEM → напрямую тему сессии не поменять)
-   ▼
-Задача планировщика MacThemeSync (от пользователя MD2DD\m, скрыто через vbs)
-   ▼
-C:\Users\Public\MacThemeSync.ps1: реестр AppsUseLightTheme/SystemUsesLightTheme
-+ broadcast WM_SETTINGCHANGE "ImmersiveColorSet" → таскбар и приложения перерисовываются сразу
-```
+## Usage
 
-Задержка: ~2–4 сек. Задача в VM без триггеров (только ручной запуск через `/Run`, прогон в 23:59 убран).
+**Left click** Nightfall’s icon in the menu bar to toggle dark mode.  
+**Right click** the icon to show the options menu.
 
-## Файлы
+### Setting a Keyboard Shortcut
 
-### mac/
-- `mac2win-theme.sh` — watcher (установлен в `~/bin/`, poll раз в 1 сек; нагрузка нулевая — `defaults read` читает кэш cfprefsd)
-- `local.mac2win-theme-sync.plist` — LaunchAgent (установлен в `~/Library/LaunchAgents/`, KeepAlive, автозапуск при логине; лог `~/Library/Logs/mac2win-theme.log`)
+Nightfall allows you to toggle dark mode from anywhere with a configurable keyboard shortcut. By default, this will be set to <kbd>^⌥⌘T</kbd>. You can change this in Nightfall's settings.
 
-### vm/
-- `setup-task.ps1` — одноразовая настройка VM: пишет `MacThemeSync.ps1` + vbs-обёртку в `C:\Users\Public`, создаёт задачу планировщика `MacThemeSync` от залогиненного пользователя. **После него руками:** `$t=Get-ScheduledTask MacThemeSync; $t.Triggers=@(); Set-ScheduledTask -InputObject $t` (убрать триггер-заглушку 23:59)
-- `push-payload.sh` — хелпер передачи длинного PowerShell-скрипта в VM по кускам по 400 симв. base64 с проверкой длины (у `prlctl exec` лимит длины команды ~4–5 КБ)
+### Using Animated Transitions
 
-### nightfall-fork/
-Клон [r-thomson/Nightfall](https://github.com/r-thomson/Nightfall) — из него делаем «коробку»: галка в настройках, при включении Nightfall сам дергает винду, без watcher'а и LaunchAgent. План: `docs/PLAN-nightfall.md`
+If “Animated transition“ is enabled in preferences, Nightfall will smooth over the transition between light and dark modes with a short animation. Because of how this feature works (source code [here](Nightfall/ToggleDarkMode.swift)), **you’ll need to grant Nightfall [screen recording permissions](https://support.apple.com/guide/mac-help/control-access-to-screen-recording-on-mac-mchld6aa7d23/mac)**.
 
-### docs/
-- `PLAN-nightfall.md` — план интеграции в Nightfall
-- `memory-mac2win-theme-sync.md` — копия памяти ассистента по этой теме (грабли prlctl exec)
+### Hiding Nightfall
 
-Диалог, в котором всё это родилось, продолжается в этом проекте:
-сессия Claude Code перенесена (`claude --resume` / список сессий в VSCode при открытой папке `~/code/DarkThemeSync`).
+If you’d like to hide Nightfall from your menu bar without quitting the app, you can do so by holding the Command key and dragging the icon out of the menu bar. To reveal Nightfall again, re-open the app while it’s still running.
 
-## Грабли prlctl exec (проверено, не повторять)
-
-1. Выполняется от **SYSTEM**, не от залогиненного пользователя → HKCU пользователя не виден; тему сессии меняет только задача планировщика от пользователя.
-2. **Лимит длины команды** (~5 КБ base64 не проходит) → заливать кусками с проверкой длины на приёме (см. `vm/push-payload.sh`).
-3. Файлы, созданные SYSTEM в `C:\Windows\Temp`, обычный пользователь читать не может («Отказано в доступе») → всё в `C:\Users\Public`.
-4. Из-под launchd PATH без `/usr/local/bin` (где prlctl) → PATH в начале скрипта.
-5. `schtasks /Create` требует триггер → создаём с /SC ONCE, потом чистим триггеры.
-
-## Установка с нуля
-
-VM (через `prlctl exec` от SYSTEM): залить `vm/setup-task.ps1` хелпером `vm/push-payload.sh`, выполнить с `-ExecutionPolicy Bypass`, убрать триггер.
-
-Mac: `cp mac/mac2win-theme.sh ~/bin/ && chmod +x ~/bin/mac2win-theme.sh && cp mac/local.mac2win-theme-sync.plist ~/Library/LaunchAgents/ && launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/local.mac2win-theme-sync.plist`
-
-(Но при живом Nightfall-форке watcher/LaunchAgent не нужны — см. план.)
-
-## Удаление
-
-```bash
-launchctl bootout gui/$(id -u)/local.mac2win-theme-sync
-rm ~/Library/LaunchAgents/local.mac2win-theme-sync.plist ~/bin/mac2win-theme.sh
-```
-```powershell
-# в VM
-schtasks /Delete /TN MacThemeSync
-Remove-Item C:\Users\Public\MacThemeSync.ps1, C:\Users\Public\MacThemeSync.vbs, C:\Users\Public\mac_theme.txt
-```
-
-## Контекст
-
-- VM: «Windows 11» (Parallels), пользователь `MD2DD\m`, SID `S-1-5-21-2961813680-396835540-796207745-1000`
-- Тему на маке переключает [Nightfall](https://github.com/r-thomson/Nightfall) (у него нет ни CLI, ни хуков — потому watcher)
-- Имя VM в watcher'е меняется через `VM_NAME=... ` или правкой дефолта в скрипте

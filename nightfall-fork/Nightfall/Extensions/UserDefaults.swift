@@ -4,7 +4,6 @@ extension UserDefaults {
 	struct Keys {
 		static let useTransition = "UseTransition"
 		static let startAtLogin = "StartAtLogin"
-		static let checkForUpdates = "CheckForUpdates"
 		static let syncWindowsVM = "SyncWindowsVM"
 		static let windowsVMName = "WindowsVMName"
 	}
@@ -17,11 +16,6 @@ extension UserDefaults {
 	var startAtLogin: Bool {
 		get { self.bool(forKey: Keys.startAtLogin) }
 		set { self.set(newValue, forKey: Keys.startAtLogin) }
-	}
-
-	var checkForUpdates: Bool {
-		get { self.bool(forKey: Keys.checkForUpdates) }
-		set { self.set(newValue, forKey: Keys.checkForUpdates) }
 	}
 
 	var syncWindowsVM: Bool {

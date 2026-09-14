@@ -34,9 +34,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		// Initial sync in case a VM booted after the Mac's theme was already set
 		WindowsThemeSync.push(dark: getAppearanceTheme() == .dark)
 
-		// Begin checking for updates periodically
-		AppUpdateChecker.shared.startBackgroundChecking()
-
 		// Begins observing changes to the "StartAtLogin" default. The observer
 		// function then reads the default to set/unset the app as a login item.
 		// Because .initial is specified, it will also be set at app startup.

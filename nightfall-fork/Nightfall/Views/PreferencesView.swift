@@ -15,8 +15,6 @@ struct PreferencesView: View {
 		ObservableUserDefault<Bool>(UserDefaults.Keys.useTransition)
 	@ObservedObject private var startAtLogin =
 		ObservableUserDefault<Bool>(UserDefaults.Keys.startAtLogin)
-	@ObservedObject private var checkForUpdates =
-		ObservableUserDefault<Bool>(UserDefaults.Keys.checkForUpdates)
 	@ObservedObject private var syncWindowsVM =
 		ObservableUserDefault<Bool>(UserDefaults.Keys.syncWindowsVM)
 
@@ -56,8 +54,6 @@ struct PreferencesView: View {
 				}
 
 				Toggle("Start Nightfall at login", isOn: $startAtLogin.value)
-
-				Toggle("Check for new versions", isOn: $checkForUpdates.value)
 
 				Divider()
 					.padding(.vertical, 6)
