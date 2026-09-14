@@ -2,6 +2,8 @@
 
 Форк [Nightfall](https://github.com/r-thomson/Nightfall) — переключатель тёмной темы macOS — с синхронизацией темы в Windows-VM Parallels.
 
+Публичный форк: **[0x3654/Nightfall](https://github.com/0x3654/Nightfall)** (релизы: [releases](https://github.com/0x3654/Nightfall/releases)). Этот репозиторий — приватный воркспейс (прототип, планы, память); код приложения живёт в форке.
+
 > [!IMPORTANT]
 > **Этот форк** (база — оригинальный [r-thomson/Nightfall](https://github.com/r-thomson/Nightfall) @ `9e3f0a1`) расширяет его:
 >
@@ -20,7 +22,7 @@ https://user-images.githubusercontent.com/29545379/150662417-90e6a4f8-7ad9-436a-
 
 | | Version | Signed |
 |---|---|---|
-| **This fork** (+ Windows-VM theme sync) | [releases of this repository](../../releases) | ✗ ad-hoc |
+| **This fork** (+ Windows-VM theme sync) | [releases](https://github.com/0x3654/Nightfall/releases) | ✗ ad-hoc |
 | **Official release** | [latest](https://github.com/r-thomson/Nightfall/releases/latest) | ✓ |
 
 1. Download **Nightfall-arm64.zip** from the releases page
