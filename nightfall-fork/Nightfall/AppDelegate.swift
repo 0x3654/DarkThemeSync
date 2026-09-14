@@ -12,7 +12,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 		UserDefaults.standard.register(defaults: [
 			UserDefaults.Keys.useTransition: true,
 			UserDefaults.Keys.startAtLogin: false,
-			UserDefaults.Keys.checkForUpdates: true,
 			UserDefaults.Keys.syncWindowsVM: false,
 			UserDefaults.Keys.windowsVMName: "Windows 11",
 		])
